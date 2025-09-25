@@ -33,7 +33,7 @@ A FastAPI-based Retrieval-Augmented Generation (RAG) system for real estate prop
 
 1. Clone the repository:
    ```bash
-   git clone [<your-repo-url>](https://github.com/Kadry-jr/AssistAura)
+   git clone https://github.com/Kadry-jr/AssistAura
    cd assistaura
    ```
 
