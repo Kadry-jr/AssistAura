@@ -33,7 +33,7 @@ A FastAPI-based Retrieval-Augmented Generation (RAG) system for real estate prop
 
 1. Clone the repository:
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/Kadry-jr/AssistAura
    cd assistaura
    ```
 
@@ -56,6 +56,13 @@ A FastAPI-based Retrieval-Augmented Generation (RAG) system for real estate prop
    cp .env.example .env
    ```
    Edit the `.env` file with your configuration.
+
+ 5. Create a directory named data and place the CSV file:
+   ```bash
+   assistaura/
+   ├── data/
+   |   ├── properties_cleaned.csv
+   ```
 
 ### Configuration
 
