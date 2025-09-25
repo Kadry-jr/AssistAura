@@ -1,0 +1,12 @@
+gradio
+requests
+pydantic
+# requirements.txt - Updated for free options
+fastapi
+uvicorn[standard]
+python-dotenv
+pandas
+sentence-transformers
+chromadb
+openai  # optional - only if using OpenAI
+groq  # for free Groq API
