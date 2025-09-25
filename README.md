@@ -57,6 +57,13 @@ A FastAPI-based Retrieval-Augmented Generation (RAG) system for real estate prop
    ```
    Edit the `.env` file with your configuration.
 
+ 5. Create a directory named data and place the CSV file:
+   ```bash
+   assistaura/
+   ├── data/
+   |   ├── properties_cleaned.csv
+   ```
+
 ### Configuration
 
 Configure the following environment variables in your `.env` file:
