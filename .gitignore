@@ -46,8 +46,7 @@ Thumbs.db
 .chroma/
 chroma_db/
 conversation_history.db
-data/*.csv
-!data/properties_cleaned.csv  # Keep the cleaned data file
+
 
 # Jupyter Notebook
 .ipynb_checkpoints
