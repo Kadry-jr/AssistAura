@@ -18,42 +18,52 @@ OPENAI_KEY = os.getenv('OPENAI_API_KEY')
 OPENAI_CHAT_MODEL = os.getenv('OPENAI_CHAT_MODEL', 'gpt-4o-mini')
 
 SYSTEM_PROMPT = """You are an expert Egyptian real estate assistant helping users find properties in Egypt.
- AVAILABLE PROPERTY ATTRIBUTES:
-  - Location (city/area)
-   - Property type (apartment, villa, townhouse, office, etc.) 
-   - Number of bedrooms - Number of bathrooms 
-   - Area in square meters 
-   - Price in EGP - Price per square meter
-- Payment plan details (if available) 
-- Project/Compound name 
+
+AVAILABLE PROPERTY ATTRIBUTES:
+- Location (city/area)
+- Property type (apartment, villa, townhouse, office, etc.) 
+- Number of bedrooms and bathrooms
+- Area in square meters
+- Price in EGP
+- Price per square meter
+- Payment plan details (if available)
+- Project/Compound name
 
 CAPABILITIES: 
 1. Property Search and Filtering
 2. Property Information and Details
-3. Property Comparison (compare multiple properties side-by-side)
+3. Property Comparison - When comparing properties, provide:
+   - Clear identification of best value (lowest price per sqm)
+   - Spaciousness comparison
+   - Location advantages/disadvantages
+   - Recommendation based on typical buyer needs
 4. Market Insights and Price Analysis
 
-COMPARISON FEATURES:
-- Compare 2 or more properties
-- Analyze price per square meter
-- Identify best value options
-- Highlight key differences
+COMPARISON GUIDELINES:
+- Be concise - max 150 words for comparisons
+- Start with "Comparing X properties:" 
+- Highlight the SINGLE best property for value
+- Mention key differentiators only
+- End with one clear recommendation
 
-GUIDELINES: 
-1. Be concise and factual based on available property data 
-2. If exact matches aren't found, suggest similar options 
-3. For price comparisons, always show price per square meter 
-4. When showing multiple properties, include key details in a structured format 
-5. Be transparent about any limitations in the data 
-6. For comparisons, clearly explain pros/cons of each property
-7. Always mention the source of the property listing
+GENERAL GUIDELINES:
+1. Be concise and factual based on available property data
+2. If exact matches aren't found, suggest similar options
+3. For price comparisons, always reference price per square meter
+4. When showing multiple properties, use structured format
+5. Be transparent about any limitations in the data
 
-RESPONSE FORMAT: 
-1. Start with a brief summary of found properties 
-2. List key details for each property (price, size, location, etc.) 
-3. Include relevant calculations (price per sqm, monthly payments if applicable) 
-4. For comparisons, provide clear analysis and recommendations
-5. End with next steps or suggestions"""
+RESPONSE FORMAT (Regular Queries):
+1. Brief summary of found properties
+2. List key details (price, size, location)
+3. Include price per sqm calculations
+4. End with helpful next step
+
+RESPONSE FORMAT (Comparisons):
+1. "Comparing X properties:"
+2. Best value identification
+3. Key differences (2-3 points max)
+4. Clear recommendation (1 sentence)"""
 
 # Enhanced keyword detection
 SMALL_TALK = {"hello", "hi", "hey", "how are you", "thanks", "thank you", "good morning", "good evening", "bye",
@@ -174,19 +184,28 @@ class LLMService:
         else:
             return f"Only {len(cards)} property available - cannot compare. Please search for more properties first."
 
-        # Format properties for comparison
-        comparison_lines = ["Properties to compare:"]
+        # Format properties for comparison with better structure
+        comparison_lines = ["Here are the properties to compare:\n"]
         for i, card in enumerate(comparison_cards, 1):
-            line = f"\nProperty {i}: {card['title']}"
-            line += f"\n  Location: {card.get('location', 'N/A')}"
-            line += f"\n  Type: {card.get('type', 'N/A')}"
-            line += f"\n  Bedrooms: {card.get('beds', 'N/A')}"
-            line += f"\n  Bathrooms: {card.get('baths', 'N/A')}"
-            line += f"\n  Area: {card.get('area_m2', 'N/A')} sqm"
-            line += f"\n  Price: {int(card.get('price_egp', 0)):,} EGP"
-            if card.get('price_per_m2'):
-                line += f"\n  Price/sqm: {int(card['price_per_m2']):,} EGP/sqm"
+            price = int(card.get('price_egp', 0)) if card.get('price_egp') else 'N/A'
+            area = int(card.get('area_m2', 0)) if card.get('area_m2') else 'N/A'
+            price_per_sqm = int(card.get('price_per_m2', 0)) if card.get('price_per_m2') else 'N/A'
+
+            line = f"\n🏠 Property {i}: {card['title']}"
+            line += f"\n   📍 Location: {card.get('location', 'N/A')}"
+            line += f"\n   🏗️ Type: {card.get('type', 'N/A')}"
+            line += f"\n   🛏️ Bedrooms: {card.get('beds', 'N/A')} | 🚿 Bathrooms: {card.get('baths', 'N/A')}"
+            line += f"\n   📐 Area: {area} sqm"
+            line += f"\n   💰 Price: {price:,} EGP" if isinstance(price, int) else f"\n   💰 Price: {price} EGP"
+            line += f"\n   📊 Price/sqm: {price_per_sqm:,} EGP/sqm" if isinstance(price_per_sqm,
+                                                                                 int) else f"\n   📊 Price/sqm: {price_per_sqm}"
             comparison_lines.append(line)
+
+        comparison_lines.append("\n\nProvide a brief comparison highlighting:")
+        comparison_lines.append("1. Which offers best value (lowest price per sqm)")
+        comparison_lines.append("2. Which is most spacious")
+        comparison_lines.append("3. Key differences in location/amenities")
+        comparison_lines.append("4. Your recommendation based on typical buyer priorities")
 
         return "\n".join(comparison_lines)
 
@@ -226,20 +245,20 @@ class LLMService:
 
             # Use comparison service
             comparison_result = PropertyComparison.compare_properties(hits)
-            formatted_comparison = format_comparison_response(comparison_result)
 
-            # Also get LLM response for natural language explanation
+            # Build messages with comparison data for LLM
             messages = self._build_prompt_with_context(query, cards, history)
-            if self.provider == 'groq':
-                llm_response = answer_with_context_groq(messages, hits)
-            else:
-                llm_response = answer_with_context_local(query, hits, cards, {})
 
-            # Combine structured comparison with LLM response
-            combined_answer = f"{formatted_comparison}\n\n**AI Analysis:**\n{llm_response.get('answer', '')}"
+            # Get LLM response (it will have the comparison data in the prompt)
+            if self.provider == 'groq' and GROQ_API_KEY:
+                llm_response = answer_with_context_groq(messages, hits)
+                answer_text = llm_response.get('answer', '')
+            else:
+                # Use local formatting for comparison
+                answer_text = format_comparison_response(comparison_result)
 
             return {
-                "answer": combined_answer,
+                "answer": answer_text,  # Only ONE response
                 "hits": hits,
                 "cards": cards,
                 "insights": comparison_result.get('insights', {}),
