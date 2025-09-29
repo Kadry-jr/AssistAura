@@ -74,21 +74,55 @@ async def chat_endpoint(request: ChatRequest):
         # 2) Retrieve recent history
         history = conversation_store.get_recent(session_id, n=6)
 
-        # 3) Parse filters with enhanced error handling
-        try:
-            filters = parse_filters(request.query)
-            logger.info(f"Parsed filters: {filters}")
-        except Exception as e:
-            logger.error(f"Filter parsing error: {e}")
-            filters = {}  # Continue with empty filters
+        # 3) Check if this is a comparison query
+        from app.services.llm import is_comparison_query
+        is_comparing = is_comparison_query(request.query)
 
-        # 4) Retrieve docs with error handling
-        try:
-            docs = retriever.search(request.query, k=request.k, filters=filters, session_history=history)
-            logger.info(f"Retrieved {len(docs)} documents")
-        except Exception as e:
-            logger.error(f"Retrieval error: {e}")
-            docs = []  # Continue with empty docs
+        if is_comparing:
+            # For comparison, use the LAST search results, not new search
+            logger.info("Comparison query detected - using last search results")
+            docs = conversation_store.get_last_search_results(session_id)
+
+            if not docs or len(docs) < 2:
+                # No previous search or not enough properties
+                response = {
+                    "answer": "I don't have any previous search results to compare. Please search for properties first, then ask me to compare them.\n\nExample:\n1. 'Show me villas in New Cairo'\n2. 'Compare property 1 and 3'",
+                    "hits": [],
+                    "cards": [],
+                    "insights": {}
+                }
+                conversation_store.add_message(session_id, "assistant", response['answer'])
+
+                return ChatResponseModel(
+                    session_id=session_id,
+                    answer=response['answer'],
+                    hits=[],
+                    query_id=str(hash(f"{session_id}{request.query}{datetime.utcnow().timestamp()}")),
+                    timestamp=datetime.utcnow().isoformat()
+                )
+
+            logger.info(f"Using {len(docs)} properties from last search for comparison")
+        else:
+            # Regular search - parse filters and retrieve new docs
+            try:
+                filters = parse_filters(request.query)
+                logger.info(f"Parsed filters: {filters}")
+            except Exception as e:
+                logger.error(f"Filter parsing error: {e}")
+                filters = {}
+
+            # 4) Retrieve docs with error handling
+            try:
+                docs = retriever.search(request.query, k=request.k, filters=filters, session_history=history)
+                logger.info(f"Retrieved {len(docs)} documents")
+
+                # Store these results for potential future comparison
+                conversation_store.store_search_results(session_id, docs)
+                logger.info(f"Stored search results for session {session_id}")
+
+            except Exception as e:
+                logger.error(f"Retrieval error: {e}")
+                docs = []
 
         # 5) Generate response with enhanced error handling
         try:

@@ -221,7 +221,7 @@ class LLMService:
 
         # Chit-chat / short talk handling
         if is_chit_chat(query) and not is_real_estate_query(query):
-            reply = "Hi! I'm AssistAura, your Egyptian real estate assistant. I can help you find properties, compare options, and analyze prices. Try asking: '3 bedroom villa in New Cairo under 5M EGP' or 'compare these properties'."
+            reply = "Hi! I'm AssistAura, your Egyptian real estate assistant. I can help you find properties, compare options, and analyze prices. Try asking: '3-bedroom Apartment in New Cairo under 9M EGP' or 'compare these properties'."
             return {"answer": reply, "hits": [], "cards": [], "insights": {}}
 
         # Domain guard
@@ -348,7 +348,7 @@ def answer_with_context_local(query: str, hits: list, cards: list, insights: dic
     if len(cards) > 3:
         lines.append(f"\n*Showing top 3 of {len(cards)} matching properties*")
 
-    lines.append(f"\n💡 **Next steps:** Ask for 'more details on property 1' or 'compare properties 1 and 2'")
+    lines.append(f"\n💡 **Next steps:** Ask for compare between the results or More related properties")
 
     summary = "\n".join(lines)
 
