@@ -1,10 +1,11 @@
-# app/services/llm.py
+# app/services/llm.py - ENHANCED VERSION
 import os
 import logging
+import re
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
-import pandas as pd
 from .real_estate_keywords import REAL_ESTATE_KEYWORDS
+from .comparison import PropertyComparison, format_comparison_response
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -12,12 +13,11 @@ logging.basicConfig(level=logging.INFO)
 
 LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'groq').lower()
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
-GROQ_MODEL = os.getenv('GROQ_MODEL')
+GROQ_MODEL = os.getenv('GROQ_MODEL', 'llama3-8b-8192')  # Default model
 OPENAI_KEY = os.getenv('OPENAI_API_KEY')
 OPENAI_CHAT_MODEL = os.getenv('OPENAI_CHAT_MODEL', 'gpt-4o-mini')
 
-SYSTEM_PROMPT = """
-You are an expert Egyptian real estate assistant helping users find properties in Egypt.
+SYSTEM_PROMPT = """You are an expert Egyptian real estate assistant helping users find properties in Egypt.
  AVAILABLE PROPERTY ATTRIBUTES:
   - Location (city/area)
    - Property type (apartment, villa, townhouse, office, etc.) 
@@ -25,57 +25,80 @@ You are an expert Egyptian real estate assistant helping users find properties i
    - Area in square meters 
    - Price in EGP - Price per square meter
 - Payment plan details (if available) 
-- Project/Compound name CAPABILITIES: 
-1. Property Search:
- - Filter by location (e.g., New Cairo, 6th of October, Sheikh Zayed) 
- - Filter by property type 
- - Filter by number of bedrooms/bathrooms
-  - Filter by price range 
-  - Filter by area/size 
-  - Sort by price, area, or price per square meter
-   2. Property Information: 
-   - Provide detailed property specifications 
-   - Calculate price per square meter
-   - Explain payment plans 
-   - Compare similar properties 
-   3. Market Insights: 
-   - Price ranges in different areas 
-   - Average prices by property type 
-   - Price per square meter comparisons 
-   GUIDELINES: 
-   1. Be concise and factual based on available property data 
-   2. If exact matches aren't found, suggest similar options 
-   3. For price comparisons, always show price per square meter 
-   4. When showing multiple properties, include key details in a structured format 
-   5. Be transparent about any limitations in the data 
-   6. For payment plans, clearly explain the terms and total cost 
-   7. Always mention the source of the property listing
-    LIMITATIONS: 
-    - Cannot provide legal or financial advice 
-    - Cannot guarantee availability of listed properties
-     - Prices and availability may change without notice 
-     - Always verify property details before making decisions 
-     RESPONSE FORMAT: 
-     1. Start with a brief summary of found properties 
-     2. List key details for each property (price, size, location, etc.) 
-     3. Include relevant calculations (price per sqm, monthly payments if applicable) 
-     4. End with next steps or suggestions"""
+- Project/Compound name 
 
-# small chit-chat detector
-SMALL_TALK = {"hello","hi","hey","how are you","thanks","thank you","good morning","good evening","bye"}
+CAPABILITIES: 
+1. Property Search and Filtering
+2. Property Information and Details
+3. Property Comparison (compare multiple properties side-by-side)
+4. Market Insights and Price Analysis
+
+COMPARISON FEATURES:
+- Compare 2 or more properties
+- Analyze price per square meter
+- Identify best value options
+- Highlight key differences
+
+GUIDELINES: 
+1. Be concise and factual based on available property data 
+2. If exact matches aren't found, suggest similar options 
+3. For price comparisons, always show price per square meter 
+4. When showing multiple properties, include key details in a structured format 
+5. Be transparent about any limitations in the data 
+6. For comparisons, clearly explain pros/cons of each property
+7. Always mention the source of the property listing
+
+RESPONSE FORMAT: 
+1. Start with a brief summary of found properties 
+2. List key details for each property (price, size, location, etc.) 
+3. Include relevant calculations (price per sqm, monthly payments if applicable) 
+4. For comparisons, provide clear analysis and recommendations
+5. End with next steps or suggestions"""
+
+# Enhanced keyword detection
+SMALL_TALK = {"hello", "hi", "hey", "how are you", "thanks", "thank you", "good morning", "good evening", "bye",
+              "greetings"}
+COMPARISON_KEYWORDS = {"compare", "comparison", "vs", "versus", "difference", "differences", "better", "best",
+                       "which one", "between"}
+
 
 def is_chit_chat(query: str) -> bool:
     q = query.lower().strip()
-    return any(tok in q for tok in SMALL_TALK)
+    return any(tok in q for tok in SMALL_TALK) and len(q.split()) <= 4
+
 
 def is_real_estate_query(query: str) -> bool:
     q = (query or "").lower()
     return any(word in q for word in REAL_ESTATE_KEYWORDS)
 
+
+def is_comparison_query(query: str) -> bool:
+    """Detect if user wants to compare properties"""
+    q = (query or "").lower()
+    return any(word in q for word in COMPARISON_KEYWORDS)
+
+
+def extract_property_references(query: str, num_properties: int) -> List[int]:
+    """Extract property numbers from queries like 'compare 1 and 3' or 'property 2 vs 4'"""
+    query = query.lower()
+    # Find number patterns
+    numbers = re.findall(r'\b(\d+)\b', query)
+    valid_numbers = []
+    for num_str in numbers:
+        try:
+            num = int(num_str)
+            if 1 <= num <= num_properties:  # Valid property reference
+                valid_numbers.append(num - 1)  # Convert to 0-based index
+        except ValueError:
+            continue
+    return valid_numbers
+
+
 class LLMService:
     def __init__(self, provider: str = None):
         self.provider = provider.lower() if provider else LLM_PROVIDER
         self.system_prompt = SYSTEM_PROMPT
+        self.last_search_results = []  # Store last search for comparisons
 
     def format_property_card(self, hit: dict) -> Dict[str, Any]:
         meta = hit.get('metadata', {})
@@ -91,8 +114,8 @@ class LLMService:
         except:
             area_n = None
         price_per_m2 = None
-        if price_n and area_n:
-            price_per_m2 = price_n / area_n if area_n > 0 else None
+        if price_n and area_n and area_n > 0:
+            price_per_m2 = price_n / area_n
 
         return {
             "id": hit.get('id'),
@@ -113,37 +136,117 @@ class LLMService:
         if history:
             for h in history[-6:]:
                 messages.append({"role": h.get("role"), "content": h.get("content")})
-        # build summary of cards
-        if cards:
-            summary_lines = []
-            for i, c in enumerate(cards[:5], 1):
-                summary_lines.append(f"{i}. {c['title']} - {c.get('location','')} - {c.get('beds','?')}b/{c.get('baths','?')}b - {c.get('area_m2','?')} sqm - {c.get('price_egp','?')} EGP")
-            props_text = "\n".join(summary_lines)
-        else:
-            props_text = "No properties found matching criteria."
 
-        user_content = f"User query: {query}\n\nRetrieved (top) properties:\n{props_text}\n\nPlease answer the user's question concisely, reference the best matching properties (by number), include price per sqm when possible, and end with a follow-up question."
+        # Check if this is a comparison query
+        if is_comparison_query(query) and cards:
+            # Build comparison-focused prompt
+            comparison_text = self._build_comparison_prompt(query, cards)
+            user_content = f"User query: {query}\n\n{comparison_text}\n\nPlease provide a detailed comparison analysis with recommendations."
+        else:
+            # Regular search prompt
+            if cards:
+                summary_lines = []
+                for i, c in enumerate(cards[:5], 1):
+                    line = f"{i}. {c['title']} - {c.get('location', '')} - {c.get('beds', '?')}b/{c.get('baths', '?')}b - {c.get('area_m2', '?')} sqm - {c.get('price_egp', '?')} EGP"
+                    if c.get('price_per_m2'):
+                        line += f" - {int(c['price_per_m2']):,} EGP/sqm"
+                    summary_lines.append(line)
+                props_text = "\n".join(summary_lines)
+            else:
+                props_text = "No properties found matching criteria."
+
+            user_content = f"User query: {query}\n\nRetrieved properties:\n{props_text}\n\nPlease answer the user's question concisely, reference properties by number, include price per sqm when possible, and end with a follow-up question."
+
         messages.append({"role": "user", "content": user_content})
         return messages
 
-    def generate_response(self, query: str, hits: List[Dict[str, Any]] = None, history: List[Dict[str, str]] = None) -> Dict[str, Any]:
+    def _build_comparison_prompt(self, query: str, cards: List[dict]) -> str:
+        """Build a comparison-focused prompt"""
+        # Try to extract specific property references
+        property_indices = extract_property_references(query, len(cards))
+
+        if len(property_indices) >= 2:
+            # User specified which properties to compare
+            comparison_cards = [cards[i] for i in property_indices]
+        elif len(cards) >= 2:
+            # Compare all available properties (up to 4)
+            comparison_cards = cards[:4]
+        else:
+            return f"Only {len(cards)} property available - cannot compare. Please search for more properties first."
+
+        # Format properties for comparison
+        comparison_lines = ["Properties to compare:"]
+        for i, card in enumerate(comparison_cards, 1):
+            line = f"\nProperty {i}: {card['title']}"
+            line += f"\n  Location: {card.get('location', 'N/A')}"
+            line += f"\n  Type: {card.get('type', 'N/A')}"
+            line += f"\n  Bedrooms: {card.get('beds', 'N/A')}"
+            line += f"\n  Bathrooms: {card.get('baths', 'N/A')}"
+            line += f"\n  Area: {card.get('area_m2', 'N/A')} sqm"
+            line += f"\n  Price: {int(card.get('price_egp', 0)):,} EGP"
+            if card.get('price_per_m2'):
+                line += f"\n  Price/sqm: {int(card['price_per_m2']):,} EGP/sqm"
+            comparison_lines.append(line)
+
+        return "\n".join(comparison_lines)
+
+    def generate_response(self, query: str, hits: List[Dict[str, Any]] = None, history: List[Dict[str, str]] = None) -> \
+    Dict[str, Any]:
         if hits is None:
             hits = []
         if history is None:
             history = []
 
+        # Store results for future comparisons
+        self.last_search_results = hits
+
         # Chit-chat / short talk handling
         if is_chit_chat(query) and not is_real_estate_query(query):
-            reply = "Hi! I'm AssistAura. Your real estate assistant. You can ask about properties, prices, or neighborhoods in Egypt — for example: '3 bedroom apartment in New Cairo under 5M EGP'."
+            reply = "Hi! I'm AssistAura, your Egyptian real estate assistant. I can help you find properties, compare options, and analyze prices. Try asking: '3 bedroom villa in New Cairo under 5M EGP' or 'compare these properties'."
             return {"answer": reply, "hits": [], "cards": [], "insights": {}}
 
         # Domain guard
-        if not is_real_estate_query(query):
-            return {"answer": "AssistAura can only help with Egyptian real estate questions. Try asking about apartments, villas, or areas like New Cairo.", "hits": [], "cards": [], "insights": {}}
+        if not is_real_estate_query(query) and not is_comparison_query(query):
+            return {
+                "answer": "AssistAura specializes in Egyptian real estate. I can help you find properties, compare options, or get market insights. Try asking about apartments, villas, or specific areas.",
+                "hits": [], "cards": [], "insights": {}}
 
-        # Build structured cards and simple insights
+        # Build structured cards and insights
         cards = [self.format_property_card(h) for h in hits]
-        # compute simple stats
+
+        # Handle comparison queries specially
+        if is_comparison_query(query):
+            if len(cards) < 2:
+                return {
+                    "answer": "I need at least 2 properties to compare. Please search for properties first, then ask me to compare them.",
+                    "hits": hits,
+                    "cards": cards,
+                    "insights": {}
+                }
+
+            # Use comparison service
+            comparison_result = PropertyComparison.compare_properties(hits)
+            formatted_comparison = format_comparison_response(comparison_result)
+
+            # Also get LLM response for natural language explanation
+            messages = self._build_prompt_with_context(query, cards, history)
+            if self.provider == 'groq':
+                llm_response = answer_with_context_groq(messages, hits)
+            else:
+                llm_response = answer_with_context_local(query, hits, cards, {})
+
+            # Combine structured comparison with LLM response
+            combined_answer = f"{formatted_comparison}\n\n**AI Analysis:**\n{llm_response.get('answer', '')}"
+
+            return {
+                "answer": combined_answer,
+                "hits": hits,
+                "cards": cards,
+                "insights": comparison_result.get('insights', {}),
+                "comparison": comparison_result
+            }
+
+        # Regular search handling
         price_per_m2_list = [c['price_per_m2'] for c in cards if c.get('price_per_m2')]
         avg_ppm = sum(price_per_m2_list) / len(price_per_m2_list) if price_per_m2_list else None
         insights = {"avg_price_per_m2": avg_ppm, "num_properties": len(cards)}
@@ -151,11 +254,9 @@ class LLMService:
         # Build messages for LLM provider
         messages = self._build_prompt_with_context(query, cards, history)
 
-        # Choose provider
-        if self.provider == 'groq':
+        # Choose provider (Groq only as requested)
+        if self.provider == 'groq' and GROQ_API_KEY:
             resp = answer_with_context_groq(messages, hits)
-        elif self.provider == 'openai':
-            resp = answer_with_context_openai(messages, hits)
         else:
             resp = answer_with_context_local(query, hits, cards, insights)
 
@@ -170,25 +271,69 @@ class LLMService:
 
 
 def answer_with_context_local(query: str, hits: list, cards: list, insights: dict) -> dict:
-    # Rule-based nice formatting when LLM is not used
+    """Enhanced local response with better formatting"""
     if not hits:
-        return {"answer": "No matching properties found. Try broadening your search or changing location/price.", "hits": [], "cards": [], "insights": {}}
+        return {
+            "answer": "No matching properties found. Try:\n• Broadening your search criteria\n• Changing location or price range\n• Using different property type (villa, apartment, etc.)",
+            "hits": [],
+            "cards": [],
+            "insights": {}
+        }
 
-    # pick top 3
+    # Check if comparison requested
+    if is_comparison_query(query):
+        if len(cards) >= 2:
+            comparison_result = PropertyComparison.compare_properties(hits)
+            return {
+                "answer": format_comparison_response(comparison_result),
+                "hits": hits,
+                "cards": cards,
+                "insights": comparison_result.get('insights', {}),
+                "comparison": comparison_result
+            }
+        else:
+            return {
+                "answer": "I need at least 2 properties to compare. Please search for more properties first.",
+                "hits": hits,
+                "cards": cards,
+                "insights": insights
+            }
+
+    # Regular property listing
     top = cards[:3]
-    lines = []
+    lines = ["🏠 **Found Properties:**\n"]
+
     for i, c in enumerate(top, 1):
-        line = f"{i}. {c.get('title','Property')} — {c.get('location','Unknown')} — {int(c.get('area_m2')) if c.get('area_m2') else '?'} sqm — {int(c.get('price_egp')) if c.get('price_egp') else '?'} EGP"
+        title = c.get('title', f"Property {i}")
+        location = c.get('location', 'Unknown')
+        beds = c.get('beds', '?')
+        baths = c.get('baths', '?')
+        area = int(c.get('area_m2', 0)) if c.get('area_m2') else '?'
+        price = int(c.get('price_egp', 0)) if c.get('price_egp') else '?'
+
+        line = f"**{i}. {title}**"
+        line += f"\n📍 {location} | 🛏️ {beds}BR 🚿 {baths}BA | 📐 {area} sqm"
+        line += f"\n💰 {price:,} EGP" if isinstance(price, int) else f"\n💰 {price} EGP"
+
         if c.get('price_per_m2'):
-            line += f" — {int(c['price_per_m2']):,} EGP/sqm"
+            price_per_sqm = int(c['price_per_m2'])
+            line += f" | 📊 {price_per_sqm:,} EGP/sqm"
+
         lines.append(line)
+        lines.append("")  # Empty line between properties
 
-    summary = f"I found {len(cards)} matching properties. Top results:\n\n" + "\n".join(lines)
+    # Add insights
     if insights.get('avg_price_per_m2'):
-        summary += f"\n\nAverage price per sqm among results: {int(insights['avg_price_per_m2']):,} EGP/sqm"
-    summary += "\n\nWould you like more details on any of these (e.g. 'more info on 1')?"
+        lines.append(f"📈 **Average price per sqm:** {int(insights['avg_price_per_m2']):,} EGP/sqm")
 
-    # convert hits to processed hits shape similar to earlier version
+    if len(cards) > 3:
+        lines.append(f"\n*Showing top 3 of {len(cards)} matching properties*")
+
+    lines.append(f"\n💡 **Next steps:** Ask for 'more details on property 1' or 'compare properties 1 and 2'")
+
+    summary = "\n".join(lines)
+
+    # Convert hits to processed format
     processed_hits = []
     for h in hits:
         meta = h.get('metadata', {}) or {}
@@ -203,40 +348,118 @@ def answer_with_context_local(query: str, hits: list, cards: list, insights: dic
 
 
 def answer_with_context_groq(messages: List[dict], hits: list) -> dict:
+    """Enhanced Groq integration with better error handling"""
     try:
         from groq import Groq
         if not GROQ_API_KEY:
-            logger.warning("No Groq API key. Falling back to local.")
-            return answer_with_context_local(messages[-1]['content'] if messages else "", hits, [], {})
+            logger.warning("No Groq API key found. Falling back to local response.")
+            return answer_with_context_local(
+                messages[-1]['content'] if messages else "",
+                hits,
+                [LLMService().format_property_card(h) for h in hits],
+                {}
+            )
+
         client = Groq(api_key=GROQ_API_KEY)
-        logger.debug("Sending to Groq...")
+        logger.debug(f"Sending request to Groq with model: {GROQ_MODEL}")
+
         response = client.chat.completions.create(
             model=GROQ_MODEL,
             messages=messages,
-            max_tokens=400,
-            temperature=0.1
+            max_tokens=600,  # Increased for comparison responses
+            temperature=0.1,
+            top_p=0.9,
+            frequency_penalty=0.1
         )
+
         answer_text = response.choices[0].message.content
-        return {"answer": answer_text, "hits": hits}
+
+        # Clean up response if needed
+        if answer_text:
+            answer_text = answer_text.strip()
+
+        return {
+            "answer": answer_text,
+            "hits": hits,
+            "cards": [LLMService().format_property_card(h) for h in hits]
+        }
+
     except Exception as e:
-        logger.exception("Groq error, falling back to local")
-        return answer_with_context_local(messages[-1]['content'] if messages else "", hits, [], {})
+        logger.exception(f"Groq API error: {str(e)}. Falling back to local response.")
+        return answer_with_context_local(
+            messages[-1]['content'] if messages else "",
+            hits,
+            [LLMService().format_property_card(h) for h in hits],
+            {}
+        )
 
 
 def answer_with_context_openai(messages: List[dict], hits: list) -> dict:
+    """OpenAI integration - kept for compatibility"""
     try:
         from openai import OpenAI
         if not OPENAI_KEY:
             logger.warning("No OpenAI key. Falling back to local.")
-            return answer_with_context_local(messages[-1]['content'] if messages else "", hits, [], {})
+            return answer_with_context_local(
+                messages[-1]['content'] if messages else "",
+                hits,
+                [],
+                {}
+            )
         client = OpenAI(api_key=OPENAI_KEY)
         response = client.chat.completions.create(
             model=OPENAI_CHAT_MODEL,
             messages=messages,
-            max_tokens=400,
+            max_tokens=600,
             temperature=0.1
         )
         return {"answer": response.choices[0].message.content, "hits": hits}
     except Exception as e:
         logger.exception("OpenAI error, falling back to local")
-        return answer_with_context_local(messages[-1]['content'] if messages else "", hits, [], {})
+        return answer_with_context_local(
+            messages[-1]['content'] if messages else "",
+            hits,
+            [],
+            {}
+        )
+
+
+# Test functions for debugging
+def test_bedroom_detection():
+    """Test the bedroom detection improvements"""
+    test_cases = [
+        "3 bedroom villa",
+        "show me a 2 bedroom apartment",
+        "4 bed house",
+        "5 room villa",
+        "studio apartment",  # Should not match
+        "3BR villa",
+        "2 bed townhouse"
+    ]
+
+    from .query_parser import parse_filters
+    for case in test_cases:
+        result = parse_filters(case)
+        print(f"'{case}' -> beds: {result.get('beds', 'NOT DETECTED')}")
+
+
+def test_comparison_detection():
+    """Test comparison query detection"""
+    test_cases = [
+        "compare these properties",
+        "what's better between property 1 and 2",
+        "property 1 vs property 3",
+        "show me differences",
+        "which one is better",
+        "regular villa search"  # Should not match
+    ]
+
+    for case in test_cases:
+        result = is_comparison_query(case)
+        print(f"'{case}' -> comparison: {result}")
+
+
+if __name__ == "__main__":
+    test_bedroom_detection()
+    print("\n" + "=" * 50 + "\n")
+    test_comparison_detection()
