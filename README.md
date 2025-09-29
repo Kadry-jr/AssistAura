@@ -1,53 +1,60 @@
-# Assist-Aura
+# Assist-Aura - Real Estate RAG Assistant
 
-> Part of the BautAura Real Estate Platform
+> Intelligent Property Search and Recommendation System
 
-A FastAPI-based Retrieval-Augmented Generation (RAG) system for real estate property search and recommendation. This application allows users to query property listings using natural language and receive relevant property recommendations based on semantic similarity, serving as the intelligent assistant component of the BautAura platform.
+A FastAPI-based Retrieval-Augmented Generation (RAG) system for real estate property search and recommendation. This application allows users to query property listings using natural language and receive relevant property recommendations based on semantic similarity.
 
-## Features
+## 🚀 Key Features
 
-- **Semantic Property Search**: Find properties using natural language queries
-- **Conversational Interface**: Maintains conversation context for more relevant results
-- **Advanced Filtering**: Automatically extracts and applies filters from natural language
-- **Vector Similarity Search**: Leverages ChromaDB for efficient semantic search
-- **Multi-turn Conversations**: Maintains conversation history for context-aware responses
-- **FastAPI Backend**: High-performance API with async support
+- **Natural Language Search**: Find properties using everyday language
+- **Conversational AI**: Maintains context across multi-turn conversations
+- **Smart Filtering**: Automatically extracts filters from natural language queries
+- **Property Comparison**: Compare multiple properties side by side
+- **Vector Similarity Search**: Powered by ChromaDB for efficient semantic search
+- **Flexible LLM Integration**: Supports multiple LLM providers (OpenAI, Groq, etc.)
 
-## Tech Stack
+## 🛠 Tech Stack
 
 - **Backend**: FastAPI
 - **Vector Database**: ChromaDB
-- **Embeddings**: Local or cloud-based embeddings
-- **LLM Integration**: Support for multiple LLM providers
-- **Session Management**: In-memory conversation store
+- **Embeddings**: Local or cloud-based sentence transformers
+- **LLM Integration**: OpenAI, Groq, and other compatible providers
+- **Session Management**: SQLite-based conversation store
 
-## Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
 
 - Python 3.8+
-- pip
-- ChromaDB
+- pip (Python package manager)
+- [Optional] Docker for containerized deployment
 
 ### Installation
 
-1. Clone the repository:
+1. **Clone the repository**:
    ```bash
    git clone https://github.com/Kadry-jr/AssistAura
-   cd assistaura
+   cd AssistAura
    ```
 
-2. Create and activate a virtual environment:
+2. **Set up a virtual environment**:
    ```bash
    python -m venv .venv
-   # On Windows:
-   .venv\Scripts\activate
-   # On macOS/Linux:
-   source .venv/bin/activate
+   .venv\Scripts\activate  # Windows
+   # OR
+   source .venv/bin/activate  # macOS/Linux
    ```
 
-3. Install dependencies:
+3. **Install dependencies**:
    ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Configure environment**:
+   ```bash
+   copy .env.example .env
+   ```
+   Update the `.env` file with your API keys and settings.
    pip install -r requirements.txt
    ```
 
@@ -144,27 +151,26 @@ Check if the API is running.
 }
 ```
 
-## Development
-
-### Project Structure
+## 📚 Project Structure
 
 ```
-assistaura/
-├── app/
-│   ├── api/               # API endpoints
-│   ├── core/              # Core configuration
-│   ├── models/            # Data models
-│   ├── services/          # Business logic
-│   │   ├── llm.py         # LLM service
-│   │   ├── retriever.py   # Document retrieval
-│   │   └── vector_store.py# Vector store interface
-│   ├── schemas.py         # Pydantic models
-│   └── routers/           # API routers
-├── data/                  # Property data
-├── scripts/               # Utility scripts
-├── .env.example           # Example environment variables
-├── main.py                # Application entry point
-└── requirements.txt       # Python dependencies
+AssistAura/
+├── app/                      # Main application package
+│   ├── api/                  # API endpoints
+│   ├── core/                 # Core configurations
+│   ├── models/               # Data models
+│   ├── routers/              # API routers
+│   ├── services/             # Business logic
+│   │   ├── comparison.py     # Property comparison
+│   │   ├── llm.py           # LLM integration
+│   │   ├── retriever.py     # Document retrieval
+│   │   └── ...              # Other services
+│   └── schemas.py           # Pydantic models
+├── data/                    # Property data
+├── scripts/                 # Utility scripts
+├── .env.example             # Environment template
+├── main.py                 # Application entry point
+└── requirements.txt         # Dependencies
 ```
 
 ### Adding New Properties
