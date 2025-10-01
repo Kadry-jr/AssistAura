@@ -1,3 +1,4 @@
+sqlalchemy
 gradio
 requests
 pydantic

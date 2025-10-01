@@ -108,7 +108,8 @@ class LLMService:
     def __init__(self, provider: str = None):
         self.provider = provider.lower() if provider else LLM_PROVIDER
         self.system_prompt = SYSTEM_PROMPT
-        self.last_search_results = []  # Store last search for comparisons
+        # Remove this - we'll store in conversation store instead
+        # self.last_search_results = []
 
     def format_property_card(self, hit: dict) -> Dict[str, Any]:
         meta = hit.get('metadata', {})
@@ -216,12 +217,9 @@ class LLMService:
         if history is None:
             history = []
 
-        # Store results for future comparisons
-        self.last_search_results = hits
-
         # Chit-chat / short talk handling
         if is_chit_chat(query) and not is_real_estate_query(query):
-            reply = "Hi! I'm AssistAura, your Egyptian real estate assistant. I can help you find properties, compare options, and analyze prices. Try asking: '3-bedroom Apartment in New Cairo under 9M EGP' or 'compare these properties'."
+            reply = "Hi! I'm AssistAura, your Egyptian real estate assistant. I can help you find properties, compare options, and analyze prices. Try asking: '3 bedroom villa in New Cairo under 5M EGP' or 'compare these properties'."
             return {"answer": reply, "hits": [], "cards": [], "insights": {}}
 
         # Domain guard
@@ -233,11 +231,13 @@ class LLMService:
         # Build structured cards and insights
         cards = [self.format_property_card(h) for h in hits]
 
-        # Handle comparison queries specially
+        # Handle comparison queries - use CURRENT hits (from the search that just happened)
         if is_comparison_query(query):
-            if len(cards) < 2:
+            # For comparison, we need the hits that were just retrieved
+            # The router should pass the previous search results as hits
+            if len(hits) < 2:
                 return {
-                    "answer": "I need at least 2 properties to compare. Please search for properties first, then ask me to compare them.",
+                    "answer": "I need at least 2 properties to compare. Please search for properties first, then ask me to compare them.\n\nExample:\n1. First ask: 'Show me villas in New Cairo'\n2. Then ask: 'Compare property 1 and 3'",
                     "hits": hits,
                     "cards": cards,
                     "insights": {}
@@ -320,7 +320,7 @@ def answer_with_context_local(query: str, hits: list, cards: list, insights: dic
 
     # Regular property listing
     top = cards[:3]
-    lines = ["🏠 **Found Properties:**\n"]
+    lines = ["🏠 Found Properties:\n"]
 
     for i, c in enumerate(top, 1):
         title = c.get('title', f"Property {i}")
@@ -330,7 +330,7 @@ def answer_with_context_local(query: str, hits: list, cards: list, insights: dic
         area = int(c.get('area_m2', 0)) if c.get('area_m2') else '?'
         price = int(c.get('price_egp', 0)) if c.get('price_egp') else '?'
 
-        line = f"**{i}. {title}**"
+        line = f"{i}. {title}"
         line += f"\n📍 {location} | 🛏️ {beds}BR 🚿 {baths}BA | 📐 {area} sqm"
         line += f"\n💰 {price:,} EGP" if isinstance(price, int) else f"\n💰 {price} EGP"
 
@@ -343,12 +343,12 @@ def answer_with_context_local(query: str, hits: list, cards: list, insights: dic
 
     # Add insights
     if insights.get('avg_price_per_m2'):
-        lines.append(f"📈 **Average price per sqm:** {int(insights['avg_price_per_m2']):,} EGP/sqm")
+        lines.append(f"📈 Average price per sqm: {int(insights['avg_price_per_m2']):,} EGP/sqm")
 
     if len(cards) > 3:
-        lines.append(f"\n*Showing top 3 of {len(cards)} matching properties*")
+        lines.append(f"\nShowing top 3 of {len(cards)} matching properties")
 
-    lines.append(f"\n💡 **Next steps:** Ask for compare between the results or More related properties")
+    lines.append(f"\n💡 Next steps: Ask for 'more details on property 1' or 'compare properties 1 and 2'")
 
     summary = "\n".join(lines)
 

@@ -1,4 +1,4 @@
-# app/routers/chat.py - UPDATED VERSION
+# app/routers/chat.py
 from fastapi import APIRouter
 from pydantic import BaseModel
 from app.services.llm import LLMService
@@ -77,6 +77,9 @@ async def chat_endpoint(request: ChatRequest):
         # 3) Check if this is a comparison query
         from app.services.llm import is_comparison_query
         is_comparing = is_comparison_query(request.query)
+
+        # Debug log
+        logger.info(f"Is comparison query: {is_comparing}")
 
         if is_comparing:
             # For comparison, use the LAST search results, not new search
