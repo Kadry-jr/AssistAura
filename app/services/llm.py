@@ -219,7 +219,7 @@ class LLMService:
 
         # Chit-chat / short talk handling
         if is_chit_chat(query) and not is_real_estate_query(query):
-            reply = "Hi! I'm AssistAura, your Egyptian real estate assistant. I can help you find properties, compare options, and analyze prices. Try asking: '3 bedroom villa in New Cairo under 50M EGP' or 'compare these properties'."
+            reply = "Hi! I'm AssistAura, your Egyptian real estate assistant. I can help you find properties, compare options, and analyze prices. Try asking: \n'3 bedroom villa in New Cairo under 50M EGP' or 'compare these properties'."
             return {"answer": reply, "hits": [], "cards": [], "insights": {}}
 
         # Domain guard
