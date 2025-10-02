@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 from sqlalchemy import text
+import random
 
 from ..core.database import get_db
 
@@ -121,9 +122,11 @@ async def get_similar_properties_same_location(property_id: int, limit: int = 5,
             if prop_key not in unique_properties:
                 unique_properties[prop_key] = prop_dict
         
-        # 6. Convert to list and apply the limit
-        unique_results = list(unique_properties.values())[:limit]
-       # print(f"[DEBUG] Returning {len(unique_results)} unique properties after deduplication")
+        # 6. Convert to list, shuffle, and apply the limit
+        unique_results = list(unique_properties.values())
+        random.shuffle(unique_results)
+        unique_results = unique_results[:limit]
+       # print(f"[DEBUG] Returning {len(unique_results)} unique properties after deduplication and shuffling")
         
         return unique_results
         
@@ -174,9 +177,9 @@ async def get_similar_properties_any_location(property_id: int, limit: int = 5, 
         target = row_to_dict(target_result)
        # print(f"[DEBUG] Found target property with price: {target.get('price')}")
         
-        # 2. Calculate price range (±30% of target price)
-        price_range_low = target['price'] * 0.7
-        price_range_high = target['price'] * 1.3
+        # 2. Calculate price range (±10% of target price)
+        price_range_low = target['price'] * 0.9
+        price_range_high = target['price'] * 1.1
         
         #print(f"[DEBUG] Price range: {price_range_low} - {price_range_high}")
 
@@ -233,9 +236,11 @@ async def get_similar_properties_any_location(property_id: int, limit: int = 5, 
             if prop_key not in unique_properties:
                 unique_properties[prop_key] = prop_dict
         
-        # 6. Convert to list and apply the limit
-        unique_results = list(unique_properties.values())[:limit]
-       # print(f"[DEBUG] Returning {len(unique_results)} unique properties after deduplication")
+        # 6. Convert to list, shuffle, and apply the limit
+        unique_results = list(unique_properties.values())
+        random.shuffle(unique_results)
+        unique_results = unique_results[:limit]
+       # print(f"[DEBUG] Returning {len(unique_results)} unique properties after deduplication and shuffling")
         
         return unique_results
         
@@ -329,11 +334,11 @@ async def get_user_based_recommendations(user_id: int, limit: int = 5, db: Sessi
             }
         ).fetchall()
 
-        # Convert to list of dicts for response
-        return [
-            row_to_dict(prop)
-            for prop in recommended_results
-        ]
+        # Convert to list of dicts and shuffle
+        recommended_properties = [row_to_dict(prop) for prop in recommended_results]
+        random.shuffle(recommended_properties)
+        
+        return recommended_properties
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating recommendations: {str(e)}")
