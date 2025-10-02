@@ -17,34 +17,61 @@ def get_project_structure(root_dir: str, ignore_dirs: List[str] = None) -> Dict[
     Recursively get the project structure and file information.
     """
     if ignore_dirs is None:
-        ignore_dirs = ['.git', '__pycache__', '.pytest_cache', '.venv', 'venv']
+        ignore_dirs = ['.git', '__pycache__', '.pytest_cache', '.venv', 'venv', '.gradio', '.idea']
 
     project_structure = {}
     root_path = pathlib.Path(root_dir)
-
+    
+    # First add all directories to maintain hierarchy
+    for dirpath, dirnames, _ in os.walk(root_dir):
+        # Remove ignored directories from dirnames to prevent os.walk from traversing them
+        dirnames[:] = [d for d in dirnames if not any(ignore in d for ignore in ignore_dirs)]
+        
+        relative_path = str(pathlib.Path(dirpath).relative_to(root_dir))
+        if relative_path == '.':
+            relative_path = ''
+            
+        # Add current directory if it's not the root
+        if relative_path and relative_path not in project_structure:
+            project_structure[relative_path] = FileInfo(
+                path=relative_path,
+                is_dir=True,
+                size=0
+            )
+            
+        # Add all subdirectories
+        for dirname in dirnames:
+            dir_rel_path = os.path.join(relative_path, dirname) if relative_path else dirname
+            project_structure[dir_rel_path] = FileInfo(
+                path=dir_rel_path,
+                is_dir=True,
+                size=0
+            )
+    
+    # Then process all files
     for item in root_path.rglob('*'):
         if any(ignore in str(item) for ignore in ignore_dirs):
             continue
-
-        relative_path = str(item.relative_to(root_dir))
-        is_dir = item.is_dir()
-        size = sum(f.stat().st_size for f in item.glob('**/*') if f.is_file()) if is_dir else item.stat().st_size
-
-        file_info = FileInfo(
-            path=relative_path,
-            is_dir=is_dir,
-            size=size
-        )
-
-        # Read content of relevant files
-        if not is_dir and should_include_file(relative_path):
-            try:
-                with open(item, 'r', encoding='utf-8') as f:
-                    file_info.content = f.read()
-            except (UnicodeDecodeError, PermissionError):
-                file_info.content = "[Binary or unreadable file]"
-
-        project_structure[relative_path] = file_info
+            
+        if item.is_file():
+            relative_path = str(item.relative_to(root_dir))
+            size = item.stat().st_size
+            
+            file_info = FileInfo(
+                path=relative_path,
+                is_dir=False,
+                size=size
+            )
+            
+            # Read content of relevant files
+            if should_include_file(relative_path):
+                try:
+                    with open(item, 'r', encoding='utf-8') as f:
+                        file_info.content = f.read()
+                except (UnicodeDecodeError, PermissionError):
+                    file_info.content = "[Binary or unreadable file]"
+            
+            project_structure[relative_path] = file_info
 
     return project_structure
 
@@ -60,6 +87,56 @@ def should_include_file(file_path: str) -> bool:
         return False
     return ext.lower() in include_extensions
 
+def generate_directory_tree(project_structure: Dict[str, FileInfo]) -> str:
+    """Generate a proper directory tree structure."""
+    tree_lines = []
+    dirs = []
+    files = []
+    
+    # Separate directories and files
+    for rel_path, info in project_structure.items():
+        if info.is_dir:
+            dirs.append((rel_path, info))
+        else:
+            files.append((rel_path, info))
+    
+    # Sort directories and files
+    dirs.sort()
+    files.sort()
+    
+    # Process directories with proper indentation
+    for rel_path, info in dirs:
+        parts = rel_path.split(os.sep)
+        for i in range(1, len(parts) + 1):
+            current_path = os.path.join(*parts[:i])
+            if current_path not in project_structure:
+                continue
+                
+            indent = '    ' * (i - 1)
+            if i == len(parts):
+                tree_lines.append(f"{indent}└── {parts[-1]}/")
+            elif i == 1 and current_path not in [d[0] for d in dirs if d[0] != rel_path and d[0].startswith(parts[0])]:
+                tree_lines.append(f"{indent}├── {parts[i-1]}/")
+    
+    # Process files with proper indentation
+    for rel_path, info in files:
+        parts = rel_path.split(os.sep)
+        if len(parts) > 1:
+            # Find the last directory that exists in our structure
+            for i in range(len(parts)-1, 0, -1):
+                parent_path = os.path.join(*parts[:i])
+                if parent_path in project_structure:
+                    indent = '    ' * i
+                    tree_lines.append(f"{indent}└── {parts[-1]} ({info.size} bytes)")
+                    break
+        else:
+            tree_lines.append(f"├── {rel_path} ({info.size} bytes)")
+    
+    return '\n'.join([
+        ".",
+        *tree_lines
+    ])
+
 def generate_markdown_docs(project_structure: Dict[str, FileInfo], output_file: str = "PROJECT_DOCS.md"):
     """Generate markdown documentation from the project structure."""
     with open(output_file, 'w', encoding='utf-8') as f:
@@ -74,22 +151,15 @@ def generate_markdown_docs(project_structure: Dict[str, FileInfo], output_file: 
 
         # Project Structure
         f.write("\n## Project Structure\n\n```")
-
-        # Sort directories first, then files
-        sorted_items = sorted(project_structure.items(),
-                             key=lambda x: (not x[1].is_dir, x[0]))
-
-        for rel_path, info in sorted_items:
-            indent = '    ' * (len(rel_path.split(os.sep)) - 1)
-            if info.is_dir:
-                f.write(f"\n{indent}{os.path.basename(rel_path)}/")
-            else:
-                f.write(f"\n{indent}{os.path.basename(rel_path)} ({info.size} bytes)")
-
+        f.write("\n" + generate_directory_tree(project_structure))
         f.write("\n```\n\n")
 
         # Key Files Section
         f.write("## Key Files\n\n")
+
+        # Sort items: directories first, then files, both alphabetically
+        sorted_items = sorted(project_structure.items(), 
+                            key=lambda x: (not x[1].is_dir, x[0]))
 
         for rel_path, info in sorted_items:
             if not info.is_dir and info.content is not None:

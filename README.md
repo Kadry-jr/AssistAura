@@ -151,6 +151,81 @@ Check if the API is running.
 }
 ```
 
+## 🔍 Recommendation System
+
+The application includes a powerful recommendation system that helps users discover relevant properties based on different criteria. The system provides three types of recommendations:
+
+1. **Location-based Similar Properties**: Finds properties in the same location with similar pricing
+2. **Price-based Similar Properties**: Finds properties with similar pricing regardless of location
+3. **User-based Recommendations**: Provides personalized recommendations based on user preferences and behavior
+
+### 📍 Location-based Similar Properties
+
+Finds properties in the same location with similar pricing (±30% of the target property's price).
+
+**Endpoint**: `GET /recommendations/similar/location/{property_id}`
+
+**Parameters**:
+- `property_id` (required): ID of the property to find similar ones for
+- `limit` (optional, default=5): Maximum number of similar properties to return
+
+**Example Request**:
+```http
+GET /recommendations/similar/location/123?limit=5
+```
+
+### 💰 Price-based Similar Properties
+
+Finds properties with similar pricing (±30% of the target property's price) regardless of location.
+
+**Endpoint**: `GET /recommendations/similar/anywhere/{property_id}`
+
+**Parameters**:
+- `property_id` (required): ID of the property to find similar ones for
+- `limit` (optional, default=5): Maximum number of similar properties to return
+
+**Example Request**:
+```http
+GET /recommendations/similar/anywhere/123?limit=5
+```
+
+### 👤 User-based Recommendations
+
+Provides personalized property recommendations based on the user's preferences and behavior.
+
+**Endpoint**: `GET /recommendations/user/{user_id}`
+
+**Parameters**:
+- `user_id` (required): ID of the user to get recommendations for
+- `limit` (optional, default=5): Maximum number of recommendations to return
+
+**Example Request**:
+```http
+GET /recommendations/user/456?limit=5
+```
+
+### Response Format
+
+All recommendation endpoints return an array of property objects with the following structure:
+
+```json
+[
+  {
+    "property_details_id": 123,
+    "address": "123 Main St, City",
+    "area": 120.5,
+    "description": "Beautiful property with great views...",
+    "price": 250000,
+    "title": "Luxury Apartment in Prime Location",
+    "type": "Apartment",
+    "purpose": "For Sale",
+    "property_status": "Available",
+    "image_url": "https://example.com/image1.jpg"
+  },
+  ...
+]
+```
+
 ## 📚 Project Structure
 
 ```
