@@ -47,7 +47,7 @@ A FastAPI-based Retrieval-Augmented Generation (RAG) system for real estate prop
 
 3. **Install dependencies**:
    ```bash
-   pip install -r requirements.txt
+      pip install -r requirements.txt
    ```
 
 4. **Configure environment**:
@@ -55,6 +55,7 @@ A FastAPI-based Retrieval-Augmented Generation (RAG) system for real estate prop
    copy .env.example .env
    ```
    Update the `.env` file with your API keys and settings.
+   ```bash
    pip install -r requirements.txt
    ```
 
