@@ -1,4 +1,4 @@
-# app/services/query_parser.py - IMPROVED VERSION
+# app/services/query_parser.py
 import re
 from typing import Dict, Any, Optional, Tuple
 from .real_estate_keywords import REAL_ESTATE_KEYWORDS
@@ -6,7 +6,7 @@ from .real_estate_keywords import REAL_ESTATE_KEYWORDS
 _num_re = re.compile(r'(\d+(?:[.,]\d+)?)')
 _range_re = re.compile(r'(\d+(?:[.,]\d+)?)\s*(?:-|to|–)\s*(\d+(?:[.,]\d+)?)')
 
-# IMPROVED BEDROOM DETECTION - Multiple patterns
+# BEDROOM DETECTION - Multiple patterns
 beds_patterns = [
     re.compile(r'(\d+)\s*(?:bedrooms?|beds?|br\b)', re.IGNORECASE),
     re.compile(r'(\d+)\s*(?:bedroom|bed)', re.IGNORECASE),  # "3 bedroom villa"
@@ -14,16 +14,16 @@ beds_patterns = [
     re.compile(r'(\d+)\s*(?:room)', re.IGNORECASE),  # "3 room apartment"
 ]
 
-# IMPROVED BATHROOM DETECTION
+# BATHROOM DETECTION
 baths_patterns = [
     re.compile(r'(\d+)\s*(?:bathrooms?|baths?|ba\b)', re.IGNORECASE),
     re.compile(r'(\d+)\s*(?:bathroom|bath)', re.IGNORECASE),
-    re.compile(r'(\d+)(?:\.\d+)?\s*(?:bath)', re.IGNORECASE),  # "2.5 bath"
+    re.compile(r'(\d+)(?:\.\d+)?\s*(?:bath)', re.IGNORECASE),
 ]
 
 sqm_re = re.compile(r'(\d+(?:[.,]\d+)?)\s*(?:sqm|m2|sq m|square meters|square metres|sq\.m)', re.IGNORECASE)
 
-# IMPROVED PRICE PATTERNS
+# PRICE PATTERNS
 price_patterns = [
     re.compile(r'(under|below|less than|up to|upto|<=|<)\s*([0-9.,kKmM]+)', re.IGNORECASE),
     re.compile(r'(over|above|more than|>=|>)\s*([0-9.,kKmM]+)', re.IGNORECASE),
@@ -126,7 +126,7 @@ def find_location(text: str) -> Optional[str]:
 
 
 PROPERTY_TYPES = {
-    'apartment', 'villa', 'house', 'condo', 'townhouse', 'studio', 'penthouse', 'duplex', 'mansion', 'loft', 'flat'
+    'apartment', 'villa', 'house', 'condo', 'townhouse', 'studio', 'penthouse', 'duplex', 'mansion', 'loft', 'flat' , 'retail' , 'office' , 'warehouse' , 'commercial' , 'land' , 'other'
 }
 
 
@@ -139,16 +139,16 @@ def find_property_type(text: str) -> Optional[str]:
 
 
 def parse_filters(text: str) -> Dict[str, Any]:
-    """IMPROVED filter parsing with better detection"""
+    """ filter parsing with better detection"""
     text = (text or "").lower()
     filters = {}
 
-    # IMPROVED bedrooms detection
+    #  bedrooms detection
     beds = parse_bedrooms(text)
     if beds:
         filters['beds'] = beds
 
-    # IMPROVED bathrooms detection
+    #  bathrooms detection
     baths = parse_bathrooms(text)
     if baths:
         filters['baths'] = baths
@@ -160,7 +160,7 @@ def parse_filters(text: str) -> Dict[str, Any]:
         if val:
             filters['area_m2'] = val
 
-    # IMPROVED price range
+    #  price range
     pmin, pmax = parse_price_range(text)
     if pmin is not None or pmax is not None:
         pr = {}
@@ -181,7 +181,7 @@ def parse_filters(text: str) -> Dict[str, Any]:
     return filters
 
 
-# TEST FUNCTION - Add this for debugging
+# TEST FUNCTION
 def test_parsing():
     """Test function to verify parsing works correctly"""
     test_queries = [
