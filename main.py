@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.routers.chat import router as chat_router
+from app.routers.recommendations import router as recommendations_router
 from dotenv import load_dotenv
 import os
 import logging
@@ -42,6 +43,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Include routers
 app.include_router(chat_router, prefix="/api")
+app.include_router(recommendations_router, prefix="/api")
 
 @app.get('/health', tags=["Health"])
 async def health_check():
