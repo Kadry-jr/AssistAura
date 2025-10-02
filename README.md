@@ -47,7 +47,7 @@ A FastAPI-based Retrieval-Augmented Generation (RAG) system for real estate prop
 
 3. **Install dependencies**:
    ```bash
-   pip install -r requirements.txt
+      pip install -r requirements.txt
    ```
 
 4. **Configure environment**:
@@ -55,6 +55,7 @@ A FastAPI-based Retrieval-Augmented Generation (RAG) system for real estate prop
    copy .env.example .env
    ```
    Update the `.env` file with your API keys and settings.
+   ```bash
    pip install -r requirements.txt
    ```
 
@@ -257,7 +258,3 @@ To add new properties to the vector store:
    ```bash
    python scripts/ingest_to_vectorstore.py
    ```
-
-## License
-
-This project is part of the BautAura platform and is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
