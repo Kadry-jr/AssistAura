@@ -1,7 +1,6 @@
 import os
 import pathlib
 from typing import List, Dict, Optional
-import markdown
 from dataclasses import dataclass
 
 @dataclass

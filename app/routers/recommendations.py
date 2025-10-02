@@ -309,7 +309,7 @@ async def get_user_based_recommendations(user_id: int, limit: int = 5, db: Sessi
             
         other_user_ids = [f[0] for f in other_user_favs]
 
-        # Get properties these other users liked, excluding already favorited ones
+        # Get properties these other users liked, excluding already favorites ones
         recommended_query = text("""
             SELECT DISTINCT pd.*, p.property_status, m.url as image_url
             FROM property_details pd

@@ -46,8 +46,9 @@ PROPERTY_TYPE_MAPPING = {
     'land': 'LAND',
     'warehouse': 'WAREHOUSE',
     'commercial': 'COMMERCIAL',
-    'retail': 'RETAIL',
-    'Retail': 'RETAIL'
+    'retail': 'Others',
+    'Retail': 'OTHERS',
+
 }
 
 

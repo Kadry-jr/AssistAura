@@ -23,42 +23,6 @@ class ChatRequest(BaseModel):
     k: int = 5
 
 
-# DEBUG ENDPOINT - Remove in production
-@router.get("/debug/test-parsing")
-async def test_parsing_endpoint():
-    """Debug endpoint to test query parsing"""
-    test_queries = [
-        "3 bedroom villa in New Cairo",
-        "show me a 2 bedroom apartment",
-        "4 bed house under 2M EGP",
-        "villa between 1.5M and 3M",
-        "apartment under 500k",
-        "over 1M EGP villa",
-        "3BR 2BA house",
-        "compare property 1 and 2",
-        "what's better between these"
-    ]
-
-    results = {}
-    for query in test_queries:
-        try:
-            parsed = parse_filters(query)
-            results[query] = {
-                "parsed_filters": parsed,
-                "status": "success"
-            }
-        except Exception as e:
-            results[query] = {
-                "error": str(e),
-                "status": "error"
-            }
-
-    return {
-        "test_results": results,
-        "groq_model": llm_service.provider,
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
 
 @router.post("/chat", response_model=ChatResponseModel)
 async def chat_endpoint(request: ChatRequest):
