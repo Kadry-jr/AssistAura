@@ -128,12 +128,12 @@ def format_comparison_response(comparison_result: Dict[str, Any]) -> str:
     insights = comparison_result.get('insights', {})
     recommendations = comparison_result.get('recommendations', [])
 
-    response_lines = ["🏠 **Property Comparison**\n"]
+    response_lines = ["🏠 Property Comparison\n"]
 
     # Property summary
     for i, prop in enumerate(properties):
         meta = prop.get('metadata', {})
-        response_lines.append(f"{i + 1}. **{meta.get('title', 'Property')}**")
+        response_lines.append(f"{i + 1}. {meta.get('title', 'Property')}")
         response_lines.append(f"   📍 {meta.get('location', 'N/A')}")
         response_lines.append(f"   🛏️ {meta.get('beds', '?')}BR, 🚿 {meta.get('baths', '?')}BA")
         response_lines.append(f"   📐 {meta.get('area_m2', '?')} sqm")
@@ -145,7 +145,7 @@ def format_comparison_response(comparison_result: Dict[str, Any]) -> str:
 
     # Insights
     if insights:
-        response_lines.append("📈 **Key Insights:**")
+        response_lines.append("📈 Key Insights:")
 
         if 'price' in insights:
             cheapest_idx = insights['price']['cheapest_index']
@@ -156,7 +156,7 @@ def format_comparison_response(comparison_result: Dict[str, Any]) -> str:
         if 'value' in insights:
             best_value_idx = insights['value']['best_value_index']
             best_value = insights['value']['best_value_per_sqm']
-            response_lines.append(f"⭐ Best value: Property {best_value_idx + 1} ({int(best_value):,} EGP/sqm)")
+            response_lines.append(f"Best value: Property {best_value_idx + 1} ({int(best_value):,} EGP/sqm)")
 
         if 'area' in insights:
             largest_idx = insights['area']['largest_index']
@@ -164,44 +164,11 @@ def format_comparison_response(comparison_result: Dict[str, Any]) -> str:
 
     # Recommendations
     if recommendations:
-        response_lines.append("\n🎯 **Recommendations:**")
+        response_lines.append("\n🎯 Recommendations:")
         for rec in recommendations:
             response_lines.append(f"• {rec}")
 
     return "\n".join(response_lines)
-
-
-# Test function
-def test_comparison():
-    """Test comparison functionality"""
-    test_properties = [
-        {
-            'id': 'prop1',
-            'metadata': {
-                'title': 'Villa A',
-                'price_egp': 2000000,
-                'area_m2': 250,
-                'beds': 3,
-                'baths': 2,
-                'location': 'New Cairo'
-            }
-        },
-        {
-            'id': 'prop2',
-            'metadata': {
-                'title': 'Villa B',
-                'price_egp': 2500000,
-                'area_m2': 300,
-                'beds': 4,
-                'baths': 3,
-                'location': 'Sheikh Zayed'
-            }
-        }
-    ]
-
-    comparison = PropertyComparison.compare_properties(test_properties)
-    formatted_response = format_comparison_response(comparison)
-    print(formatted_response)
 
 
 if __name__ == "__main__":
