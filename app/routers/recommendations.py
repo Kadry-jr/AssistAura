@@ -25,7 +25,7 @@ async def get_similar_properties_same_location(property_id: int, limit: int = 5,
     - **limit**: Maximum number of similar properties to return (default: 5)
     """
     try:
-        print(f"[DEBUG] Starting location-based recommendations for property {property_id}")
+       # print(f"[DEBUG] Starting location-based recommendations for property {property_id}")
         
         # 1. Get target property details (excluding latitude/longitude)
         target_query = text("""
@@ -50,7 +50,7 @@ async def get_similar_properties_same_location(property_id: int, limit: int = 5,
             raise HTTPException(status_code=404, detail="Property not found")
         
         target = row_to_dict(target_result)
-        print(f"[DEBUG] Found target property with address: {target.get('address')}")
+       # print(f"[DEBUG] Found target property with address: {target.get('address')}")
         
         if not target.get('address'):
             print("[WARNING] Target property has no address data")
@@ -60,8 +60,8 @@ async def get_similar_properties_same_location(property_id: int, limit: int = 5,
         price_range_low = target['price'] * 0.7
         price_range_high = target['price'] * 1.3
         
-        print(f"[DEBUG] Price range: {price_range_low} - {price_range_high}")
-        print(f"[DEBUG] Looking for properties with address: {target['address']}")
+      #  print(f"[DEBUG] Price range: {price_range_low} - {price_range_high}")
+       # print(f"[DEBUG] Looking for properties with address: {target['address']}")
 
         # 3. Query for properties with same address and similar price (excluding latitude/longitude)
         similar_query = text("""
@@ -98,11 +98,11 @@ async def get_similar_properties_same_location(property_id: int, limit: int = 5,
             "target_address": target['address'].strip(),
         }
         
-        print(f"[DEBUG] Query params: {query_params}")
+        #print(f"[DEBUG] Query params: {query_params}")
         
         # 4. Fetch all results and remove duplicates
         similar_results = db.execute(similar_query, query_params).fetchall()
-        print(f"[DEBUG] Found {len(similar_results)} similar properties before deduplication")
+       # print(f"[DEBUG] Found {len(similar_results)} similar properties before deduplication")
         
         # 5. Remove duplicates based on property details (excluding ID)
         unique_properties = {}
@@ -123,7 +123,7 @@ async def get_similar_properties_same_location(property_id: int, limit: int = 5,
         
         # 6. Convert to list and apply the limit
         unique_results = list(unique_properties.values())[:limit]
-        print(f"[DEBUG] Returning {len(unique_results)} unique properties after deduplication")
+       # print(f"[DEBUG] Returning {len(unique_results)} unique properties after deduplication")
         
         return unique_results
         
@@ -156,7 +156,7 @@ async def get_similar_properties_any_location(property_id: int, limit: int = 5, 
     - **limit**: Maximum number of similar properties to return (default: 5)
     """
     try:
-        print(f"[DEBUG] Starting price-based recommendations for property {property_id}")
+       # print(f"[DEBUG] Starting price-based recommendations for property {property_id}")
         
         # 1. Get target property details
         target_query = text("""
@@ -172,13 +172,13 @@ async def get_similar_properties_any_location(property_id: int, limit: int = 5, 
             raise HTTPException(status_code=404, detail="Property not found")
         
         target = row_to_dict(target_result)
-        print(f"[DEBUG] Found target property with price: {target.get('price')}")
+       # print(f"[DEBUG] Found target property with price: {target.get('price')}")
         
         # 2. Calculate price range (±30% of target price)
         price_range_low = target['price'] * 0.7
         price_range_high = target['price'] * 1.3
         
-        print(f"[DEBUG] Price range: {price_range_low} - {price_range_high}")
+        #print(f"[DEBUG] Price range: {price_range_low} - {price_range_high}")
 
         # 3. Query for similar properties (price only)
         similar_query = text("""
@@ -210,11 +210,11 @@ async def get_similar_properties_any_location(property_id: int, limit: int = 5, 
             "purpose": target['purpose']
         }
         
-        print(f"[DEBUG] Query params: {query_params}")
+        #print(f"[DEBUG] Query params: {query_params}")
         
         # 4. Fetch all results and remove duplicates
         similar_results = db.execute(similar_query, query_params).fetchall()
-        print(f"[DEBUG] Found {len(similar_results)} similar properties before deduplication")
+       # print(f"[DEBUG] Found {len(similar_results)} similar properties before deduplication")
         
         # 5. Remove duplicates based on property details (excluding ID)
         unique_properties = {}
@@ -235,7 +235,7 @@ async def get_similar_properties_any_location(property_id: int, limit: int = 5, 
         
         # 6. Convert to list and apply the limit
         unique_results = list(unique_properties.values())[:limit]
-        print(f"[DEBUG] Returning {len(unique_results)} unique properties after deduplication")
+       # print(f"[DEBUG] Returning {len(unique_results)} unique properties after deduplication")
         
         return unique_results
         
