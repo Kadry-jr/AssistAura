@@ -257,7 +257,3 @@ To add new properties to the vector store:
    ```bash
    python scripts/ingest_to_vectorstore.py
    ```
-
-## License
-
-This project is part of the BautAura platform and is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
