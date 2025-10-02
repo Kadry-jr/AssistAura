@@ -177,7 +177,7 @@ GET /recommendations/similar/location/123?limit=5
 
 ### 💰 Price-based Similar Properties
 
-Finds properties with similar pricing (±30% of the target property's price) regardless of location.
+Finds properties with similar pricing (±10% of the target property's price) regardless of location.
 
 **Endpoint**: `GET /recommendations/similar/anywhere/{property_id}`
 
