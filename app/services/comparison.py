@@ -1,15 +1,16 @@
-# app/services/comparison.py - NEW FILE
+# app/services/comparison.py
 from typing import List, Dict, Any, Optional
 import statistics
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class PropertyComparison:
 
     @staticmethod
     def compare_properties(properties: List[Dict[str, Any]], comparison_type: str = "side_by_side") -> Dict[str, Any]:
-        """
-        Compare multiple properties and generate insights
-        """
+        """Compare multiple properties and generate insights"""
         if len(properties) < 2:
             return {"error": "Need at least 2 properties to compare"}
 
@@ -27,17 +28,14 @@ class PropertyComparison:
         """Generate comparison insights"""
         insights = {}
 
-        # Extract numeric values safely
         prices = [PropertyComparison._safe_float(p.get('metadata', {}).get('price_egp')) for p in properties]
         areas = [PropertyComparison._safe_float(p.get('metadata', {}).get('area_m2')) for p in properties]
         beds = [PropertyComparison._safe_int(p.get('metadata', {}).get('beds')) for p in properties]
 
-        # Filter out None values
         valid_prices = [p for p in prices if p is not None]
         valid_areas = [a for a in areas if a is not None]
         valid_beds = [b for b in beds if b is not None]
 
-        # Price analysis
         if valid_prices:
             insights['price'] = {
                 'cheapest_index': prices.index(min(valid_prices)),
@@ -46,7 +44,6 @@ class PropertyComparison:
                 'price_range': max(valid_prices) - min(valid_prices)
             }
 
-        # Area analysis
         if valid_areas:
             insights['area'] = {
                 'smallest_index': areas.index(min(valid_areas)),
@@ -54,7 +51,6 @@ class PropertyComparison:
                 'average_area': statistics.mean(valid_areas)
             }
 
-        # Price per sqm analysis
         price_per_sqm = []
         for i, prop in enumerate(properties):
             price = PropertyComparison._safe_float(prop.get('metadata', {}).get('price_egp'))
@@ -84,17 +80,14 @@ class PropertyComparison:
 
         insights = PropertyComparison._generate_insights(properties)
 
-        # Price recommendations
         if 'price' in insights:
             cheapest_idx = insights['price']['cheapest_index']
             recommendations.append(f"Property {cheapest_idx + 1} is the most budget-friendly option")
 
-        # Value recommendations
         if 'value' in insights:
             best_value_idx = insights['value']['best_value_index']
             recommendations.append(f"Property {best_value_idx + 1} offers the best value per square meter")
 
-        # Area recommendations
         if 'area' in insights:
             largest_idx = insights['area']['largest_index']
             recommendations.append(f"Property {largest_idx + 1} provides the most living space")
@@ -103,7 +96,6 @@ class PropertyComparison:
 
     @staticmethod
     def _safe_float(value) -> Optional[float]:
-        """Safely convert to float"""
         try:
             return float(value) if value is not None else None
         except (ValueError, TypeError):
@@ -111,16 +103,14 @@ class PropertyComparison:
 
     @staticmethod
     def _safe_int(value) -> Optional[int]:
-        """Safely convert to int"""
         try:
             return int(value) if value is not None else None
         except (ValueError, TypeError):
             return None
 
 
-# Integration functions for LLM service
 def format_comparison_response(comparison_result: Dict[str, Any]) -> str:
-    """Format comparison result for LLM response"""
+    """Format comparison result into readable response"""
     if 'error' in comparison_result:
         return comparison_result['error']
 
@@ -130,20 +120,35 @@ def format_comparison_response(comparison_result: Dict[str, Any]) -> str:
 
     response_lines = ["🏠 Property Comparison\n"]
 
-    # Property summary
-    for i, prop in enumerate(properties):
+    for i, prop in enumerate(properties, 1):
         meta = prop.get('metadata', {})
-        response_lines.append(f"{i + 1}. {meta.get('title', 'Property')}")
-        response_lines.append(f"   📍 {meta.get('location', 'N/A')}")
-        response_lines.append(f"   🛏️ {meta.get('beds', '?')}BR, 🚿 {meta.get('baths', '?')}BA")
-        response_lines.append(f"   📐 {meta.get('area_m2', '?')} sqm")
-        response_lines.append(f"   💰 {int(meta.get('price_egp', 0)):,} EGP")
+        response_lines.append(f"\n🏠 Property {i}: {meta.get('title', 'Property')}")
+        response_lines.append(f"   📍 Location: {meta.get('location', 'N/A')}")
+        response_lines.append(f"   🏗️ Type: {meta.get('type', 'N/A')}")
+        response_lines.append(f"   🛏️ Bedrooms: {meta.get('beds', 'N/A')} | 🚿 Bathrooms: {meta.get('baths', 'N/A')}")
+
+        area = meta.get('area_m2', 'N/A')
+        response_lines.append(f"   📐 Area: {area} sqm")
+
+        price = meta.get('price_egp')
+        if price:
+            price = int(price)
+            response_lines.append(f"   💰 Price: {price:,} EGP")
+
+            if meta.get('area_m2') and float(meta['area_m2']) > 0:
+                try:
+                    price_per_sqm = price / float(meta['area_m2'])
+                    response_lines.append(f"   📊 Price/sqm: {int(price_per_sqm):,} EGP/sqm")
+                except (ValueError, ZeroDivisionError):
+                    pass
+        else:
+            response_lines.append("   💰 Price: N/A")
+
         if meta.get('price_egp') and meta.get('area_m2'):
             price_per_sqm = float(meta['price_egp']) / float(meta['area_m2'])
             response_lines.append(f"   📊 {int(price_per_sqm):,} EGP/sqm")
         response_lines.append("")
 
-    # Insights
     if insights:
         response_lines.append("📈 Key Insights:")
 
@@ -156,20 +161,15 @@ def format_comparison_response(comparison_result: Dict[str, Any]) -> str:
         if 'value' in insights:
             best_value_idx = insights['value']['best_value_index']
             best_value = insights['value']['best_value_per_sqm']
-            response_lines.append(f"Best value: Property {best_value_idx + 1} ({int(best_value):,} EGP/sqm)")
+            response_lines.append(f"👌Best value: Property {best_value_idx + 1} ({int(best_value):,} EGP/sqm)")
 
         if 'area' in insights:
             largest_idx = insights['area']['largest_index']
             response_lines.append(f"📏 Largest: Property {largest_idx + 1}")
 
-    # Recommendations
     if recommendations:
-        response_lines.append("\n🎯 Recommendations:")
+        response_lines.append("\nRecommendations:")
         for rec in recommendations:
             response_lines.append(f"• {rec}")
 
     return "\n".join(response_lines)
-
-
-if __name__ == "__main__":
-    test_comparison()

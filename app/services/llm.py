@@ -68,8 +68,6 @@ RESPONSE FORMAT (Comparisons):
 # Enhanced keyword detection
 SMALL_TALK = {"hello", "hi", "hey", "how are you", "thanks", "thank you", "good morning", "good evening", "bye",
               "greetings"}
-COMPARISON_KEYWORDS = {"compare", "comparison", "vs", "versus", "difference", "differences", "better", "best",
-                       "which one", "between"}
 
 
 def is_chit_chat(query: str) -> bool:
@@ -83,9 +81,41 @@ def is_real_estate_query(query: str) -> bool:
 
 
 def is_comparison_query(query: str) -> bool:
-    """Detect if user wants to compare properties"""
-    q = (query or "").lower()
-    return any(word in q for word in COMPARISON_KEYWORDS)
+    """Detect if user wants to compare properties - FIXED VERSION"""
+    if not query:
+        return False
+
+    q = query.lower().strip()
+
+    # Exact phrase matching to avoid false positives
+    comparison_phrases = [
+        "compare",
+        "comparison",
+        " vs ",
+        " versus ",
+        "which is better",
+        "which one is better",
+        "what's better",
+        "whats better",
+        "difference between",
+        "differences between",
+        "better than",
+        "worse than",
+        "compare property",
+        "compare these",
+        "compare them"
+    ]
+
+    for phrase in comparison_phrases:
+        if phrase in q:
+            if phrase == " vs " or phrase == " versus ":
+                return True
+            elif "compare" in phrase:
+                return True
+            elif "better" in phrase or "difference" in phrase:
+                return True
+
+    return False
 
 
 def extract_property_references(query: str, num_properties: int) -> List[int]:

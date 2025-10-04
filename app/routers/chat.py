@@ -78,14 +78,14 @@ async def chat_endpoint(request: ChatRequest):
                 logger.error(f"Filter parsing error: {e}")
                 filters = {}
 
-            # 4) Retrieve docs with error handling
             try:
                 docs = retriever.search(request.query, k=request.k, filters=filters, session_history=history)
                 logger.info(f"Retrieved {len(docs)} documents")
 
                 # Store these results for potential future comparison
-                conversation_store.store_search_results(session_id, docs)
-                logger.info(f"Stored search results for session {session_id}")
+                if docs and len(docs) > 0:
+                    conversation_store.store_search_results(session_id, docs, query=request.query)
+                    logger.info(f"✅ STORED {len(docs)} results for comparison")
 
             except Exception as e:
                 logger.error(f"Retrieval error: {e}")
